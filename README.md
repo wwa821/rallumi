@@ -6,7 +6,7 @@ Rallumi is built on Codex. Open it inside the desktop app, connect an existing C
 
 [Download the macOS preview](https://github.com/wwa821/rallumi/releases/tag/v0.1.0)
 
-![Rallumi group chat showing a coordinator’s final answer, a table, and the agents that contributed](docs/images/group-chat.png)
+![Three steps: link the existing Product launch brief in Codex, delegate research and review in Rallumi, and continue the same Codex conversation with the finished draft](docs/images/codex-workflow.png)
 
 ## What you keep from Codex
 
@@ -17,15 +17,6 @@ Rallumi is built on Codex. Open it inside the desktop app, connect an existing C
 ## What Rallumi adds
 
 Assign a task to a coordinator or mention individual specialists. A coordinator can answer directly or ask other members for help. Rallumi gathers member replies and marks contributors on the final answer. Hide intermediate collaboration messages when you want a quieter chat.
-
-```mermaid
-flowchart LR
-    sidebar["Open Rallumi in the Codex sidebar"] --> group["Assign work in a group chat"]
-    group --> shared["Continue a linked Codex conversation with its history"]
-    group --> fresh["Start a Codex conversation for a new member"]
-    shared --> result["Get a reply with contributor labels when agents collaborate"]
-    fresh --> result
-```
 
 ### Link a Codex conversation
 
@@ -39,7 +30,7 @@ Use the organization chart to connect coordinators and specialists, add members,
 
 ![Rallumi’s organization chart showing a coordinator and three specialists](docs/images/organization.png)
 
-The screenshots use sample data.
+The illustration and screenshots use sample data.
 
 ## Install on macOS
 

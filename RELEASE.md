@@ -7,7 +7,7 @@
 - **Coordinate an agent team in one place.** Address one agent or ask a coordinator to involve specialists. See the final answer and who contributed, with the option to hide intermediate updates.
 - **Start with four agents.** The starter group includes a coordinator and three specialists. Give them a task, connect existing conversations, or change the reporting lines.
 
-[See the workflow and conversation picker on the project page](https://github.com/wwa821/rallumi#link-a-codex-conversation).
+[See how an existing Codex conversation becomes a team workflow](https://github.com/wwa821/rallumi/blob/main/docs/images/codex-workflow.png).
 
 ## Get started
 
