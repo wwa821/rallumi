@@ -1,24 +1,45 @@
 # Rallumi
 
-**Agent group chats in the Codex sidebar.**
+**Turn your existing Codex conversations into a team, right in the Codex sidebar.**
 
-Give one agent a task, ask specialists for input, and see who contributed to the final answer. Rallumi runs locally on your Mac and uses your signed-in Codex account.
+Rallumi is built on Codex. Open it inside the desktop app, connect an existing Codex conversation to a group member, and give that member work using the context it already has.
 
-[Download v0.1.0 for macOS](https://github.com/wwa821/rallumi/releases/tag/v0.1.0)
+[Download the macOS preview](https://github.com/wwa821/rallumi/releases/tag/v0.1.0)
 
-## Group chat
+![Rallumi group chat showing a coordinator’s final answer, a table, and the agents that contributed](docs/images/group-chat.png)
 
-Mention an agent or the whole group. Read reports, tables, and contributor labels in the same conversation. You can hide intermediate collaboration messages in Group settings.
+## What you keep from Codex
 
-![Rallumi group chat with an example release checklist and contributor labels](docs/images/group-chat.png)
+- **Your existing history and project context.** Connect a member to a Codex conversation and it continues from the same thread. New messages and replies from that member are written back to the original conversation.
+- **Codex’s native subagents.** A member can use temporary Codex subagents for work that benefits from delegation. Their activity can appear in Rallumi’s organization chart when Codex reports it.
+- **Your existing desktop workflow.** Open Rallumi from the Codex sidebar and work through your signed-in Codex account. Group settings and the Rallumi transcript are stored locally on your Mac.
 
-## Organization chart
+## What Rallumi adds
 
-Draw reporting lines between agents, then add new members or connect existing Codex conversations. The starter group includes a coordinator and three specialists.
+Assign a task to a coordinator or mention individual specialists. A coordinator can answer directly or ask other members for help. Rallumi gathers member replies and marks contributors on the final answer. Hide intermediate collaboration messages when you want a quieter chat.
 
-![Rallumi organization chart with a coordinator and three reports](docs/images/organization.png)
+```mermaid
+flowchart LR
+    sidebar["Open Rallumi in the Codex sidebar"] --> group["Assign work in a group chat"]
+    group --> shared["Continue a linked Codex conversation with its history"]
+    group --> fresh["Start a Codex conversation for a new member"]
+    shared --> result["Get a reply with contributor labels when agents collaborate"]
+    fresh --> result
+```
 
-The screenshots show example conversations. New installations start with an empty chat.
+### Link a Codex conversation
+
+In **Members → Add member**, choose **Use existing Codex conversation**. You choose exactly which conversation to link to each member.
+
+![The Codex conversation picker with a selected conversation and a note that messages and replies go to the original chat](docs/images/existing-codex-chat.png)
+
+### Set up reporting lines
+
+Use the organization chart to connect coordinators and specialists, add members, and edit reporting relationships as your team changes.
+
+![Rallumi’s organization chart showing a coordinator and three specialists](docs/images/organization.png)
+
+The screenshots use sample data.
 
 ## Install on macOS
 
