@@ -18,6 +18,10 @@ Rallumi is built on Codex. Open it inside the desktop app, connect an existing C
 
 Assign a task to a coordinator or mention individual specialists. A coordinator can answer directly or ask other members for help. Rallumi gathers member replies and marks contributors on the final answer. Hide intermediate collaboration messages when you want a quieter chat.
 
+In this example, Coordinator continues an existing launch brief, delegates two checks, and turns the replies into a release note with sources and contributor labels.
+
+![Rallumi group chat showing a request to continue an existing Codex chat, two delegated checks, specialist replies, and a draft with its sources and contributors](docs/images/group-chat.png)
+
 ### Link a Codex conversation
 
 In **Members → Add member**, choose **Use existing Codex conversation**. You choose exactly which conversation to link to each member.
