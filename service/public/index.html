@@ -1,0 +1,299 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rallumi</title><link rel="stylesheet" href="/style.css?v=rallumi-identity"></head><body>
+<svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="0" height="0">
+  <symbol id="rallumi-symbol" viewBox="0 0 40 40">
+    <rect width="40" height="40" rx="10" fill="#4a36e8"/>
+    <path d="M11 29V12h10a6 6 0 0 1 0 12h-3l7.5 5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="30.5" cy="10.5" r="2.8" fill="#e3ff6a"/>
+  </symbol>
+  <symbol id="avatar-person" viewBox="0 0 24 24">
+    <circle cx="12" cy="7.5" r="3.5" fill="currentColor"/>
+    <path d="M5.5 19v-1a6.5 6.5 0 0 1 13 0v1a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1Z" fill="currentColor"/>
+  </symbol>
+  <symbol id="avatar-group" viewBox="0 0 24 24">
+    <g fill="currentColor" opacity=".53">
+      <circle cx="5.5" cy="8.5" r="2.5"/><circle cx="18.5" cy="8.5" r="2.5"/>
+      <path d="M1.3 17v-.4A4.2 4.2 0 0 1 9 14.4a7.3 7.3 0 0 0-2.5 3.6H2.3a1 1 0 0 1-1-1Zm21.4 0v-.4a4.2 4.2 0 0 0-7.7-2.2 7.3 7.3 0 0 1 2.5 3.6h4.2a1 1 0 0 0 1-1Z"/>
+    </g>
+    <g fill="currentColor">
+      <circle cx="12" cy="7" r="3.25"/>
+      <path d="M6.7 19v-1a5.3 5.3 0 0 1 10.6 0v1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1Z"/>
+    </g>
+  </symbol>
+</svg>
+<main id="app-layout">
+<aside id="group-sidebar" aria-label="群聊列表">
+  <div class="brand"><svg class="brand-symbol" aria-hidden="true"><use href="#rallumi-symbol"/></svg><span id="product-name">Rallumi</span></div>
+  <div class="section memberhead">我的群聊<button id="create" title="新建群聊" aria-label="新建群聊">＋</button></div>
+  <nav id="groups" aria-label="我的群聊"></nav>
+  <button id="show-archived-groups" type="button" hidden>已归档群聊</button>
+  <div id="group-menu" class="group-menu" aria-label="群聊操作" hidden>
+    <button id="rename-group" type="button">重命名</button>
+    <button id="archive-group" class="danger-action" type="button">删除群聊</button>
+  </div>
+  <nav class="product-actions" aria-label="产品工具">
+    <button type="button" class="header-icon sidebar-action" id="open-app-settings" title="语言" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg><span>语言</span></button>
+    <button type="button" class="header-icon sidebar-action" id="open-guide" title="使用说明" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.4 9.2a2.7 2.7 0 0 1 5.2.9c0 1.5-1.6 1.8-2.3 2.7-.2.3-.3.6-.3 1M12 16.8h.01"/></svg><span>使用说明</span></button>
+  </nav>
+</aside>
+<section class="chat">
+<header>
+  <div class="chat-heading">
+    <button id="sidebar-toggle" type="button" aria-controls="group-sidebar" aria-expanded="true" aria-label="收起群聊列表" title="收起群聊列表"><span aria-hidden="true"></span></button>
+    <span id="room-avatar" hidden></span>
+    <div>
+      <h1><span id="roomname">Rallumi</span><span id="room-member-count"></span></h1>
+      <small id="status" role="status">正在连接</small>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button type="button" class="header-icon" id="open-tasks" aria-label="群公告" title="群公告" aria-haspopup="dialog" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
+    <button type="button" class="header-icon" id="open-organization" aria-label="群成员" title="群成员" aria-haspopup="dialog" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2m1-16a3 3 0 0 1 0 6m5 10v-2a4 4 0 0 0-3-4"/></svg></button>
+    <button type="button" class="header-icon" id="open-group-settings" aria-label="群设置" title="群设置" aria-haspopup="dialog" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4l.6 2.3 1.6.9 2.3-.7 2 3.5-1.7 1.6v1.9l1.7 1.6-2 3.5-2.3-.7-1.6.9-.6 2.2h-4l-.6-2.2-1.6-.9-2.3.7-2-3.5 1.7-1.6v-1.9L3.5 9l2-3.5 2.3.7 1.6-.9z"/><circle cx="12" cy="11.5" r="2.6"/></svg></button>
+  </div>
+</header>
+<div class="history-viewport"><div class="scroll" id="scroll"><div class="content"><button id="task-announcement" class="task-announcement" type="button" hidden></button><div id="empty"><div class="mark group-avatar" aria-hidden="true"><svg class="avatar-symbol"><use href="#avatar-group"/></svg></div><h2>开始群聊</h2><p id="emptyhint">向全体提问，或在群成员里点名。</p></div><div id="history"></div><div id="live"></div><div id="approvals"></div></div></div><div class="new-message-indicator" aria-live="polite"><button type="button" id="jump-to-latest" hidden></button></div></div>
+<footer><div id="error" role="alert"></div><form id="compose"><textarea rows="2" id="message" aria-label="群消息" aria-autocomplete="list" aria-controls="mention-list" placeholder="发给全体，或输入 @成员名"></textarea><ul id="mention-list" role="listbox" aria-label="点名群成员" hidden></ul><div id="draft-files" aria-label="待发送附件"></div>
+<div id="compose-task" hidden></div><div class="actions"><div class="compose-tools">
+  <button type="button" id="mention-open" aria-label="点名群成员" aria-expanded="false" aria-controls="mention-list">@</button>
+  <button type="button" id="attach" aria-label="添加附件" title="添加附件"><span aria-hidden="true">＋</span> 附件</button>
+  <input type="file" id="file-input" multiple hidden>
+  <button type="button" id="pick-skill">调用 Skill</button>
+</div><div class="send-actions"><span id="send-targets"></span><button id="send" class="primary" disabled>发送</button></div></div></form><div class="discussion-actions"><button id="pause" type="button" disabled>暂停讨论</button></div></footer></section></main>
+<dialog id="app-settings" aria-labelledby="app-settings-title">
+  <div class="dialoghead"><h2 id="app-settings-title">产品设置</h2><button class="dialog-close" type="button" id="close-app-settings" aria-label="关闭">×</button></div>
+  <label>界面语言<select id="app-language"><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">简体中文</option></select></label>
+  <p id="app-settings-status" class="save-status" role="status"></p>
+</dialog>
+<dialog id="guide" aria-labelledby="guide-title">
+  <div class="dialoghead"><h2 id="guide-title">使用说明</h2><button class="dialog-close" type="button" id="close-guide" aria-label="关闭">×</button></div>
+  <div class="guide-content">
+    <section>
+      <h3>试着发一条消息</h3>
+      <p>在体验群里输入下面这句并发送。首次给某位 Agent 派任务时，Rallumi 会用你的 Codex 创建会话。</p>
+      <p class="guide-example" id="guide-example"></p>
+    </section>
+    <section>
+      <h3>点名和派工</h3>
+      <p>输入 @ 选择成员。统筹可以自己回答简单问题，需要协作时再请研究、执行或复核帮忙。汇总回复下方会标出回传结果的成员。</p>
+    </section>
+    <section>
+      <h3>配置自己的群</h3>
+      <p>点页顶部的群成员图标，可以添加 Agent、更改管理关系，也可以把成员关联到一个已有的 Codex 会话。群设置里可以调整字号和协作过程的显示。</p>
+    </section>
+    <section>
+      <h3>连接不上时</h3>
+      <p>确认 Codex 已登录，然后重新运行安装包里的「Install Rallumi.command」，再从侧栏打开。</p>
+    </section>
+  </div>
+</dialog>
+<dialog id="dialog"><form id="join"><div class="dialoghead"><h2>添加群成员</h2><button class="dialog-close" type="button" id="close" aria-label="关闭">×</button></div><label>会话来源<select id="source"><option value="new">新建 Codex 会话</option><option value="existing">续接已有 Codex 会话</option></select></label>
+<div id="new-location">
+  <label>存放位置<select id="new-project"><option value="">独立聊天</option></select></label>
+  <p id="location-note" aria-live="polite"></p>
+</div>
+<div id="existing" hidden>
+  <p id="chosen-thread">尚未选择会话</p>
+  <button type="button" id="open-picker">浏览 Codex 会话</button>
+</div><label>成员名<input id="name" required maxlength="16" placeholder="例如 文献"></label><label>职责<input id="role" maxlength="300" placeholder="例如 核对引用和研究依据"></label><p id="joinerror" role="alert"></p><button class="primary">加入群聊</button></form></dialog><dialog id="picker" aria-labelledby="picker-title">
+  <div class="dialoghead">
+    <h2 id="picker-title">选择 Codex 会话</h2>
+    <button class="dialog-close" type="button" id="close-picker" aria-label="关闭会话选择">×</button>
+  </div>
+  <div class="catalog-filters">
+    <label>搜索会话<input id="query" type="search" placeholder="输入会话标题或关键词"></label>
+    <label>所属项目<select id="picker-project"><option value="*">全部项目</option><option value="">独立聊天</option></select></label>
+    <label>会话范围<select id="threadview"><option value="active">当前对话</option><option value="archived">已归档</option></select></label>
+  </div>
+  <div class="picker-workspace">
+    <section class="picker-results" aria-label="会话结果">
+      <div id="picker-status" role="status"></div>
+      <div id="threads"></div>
+      <button type="button" id="more" hidden>加载更多</button>
+    </section>
+    <section class="picker-detail" aria-label="会话详情">
+      <h3 id="preview-title">选择一条会话</h3>
+      <dl id="preview-details" hidden>
+        <dt>所属项目</dt><dd id="preview-project"></dd>
+        <dt>工作目录</dt><dd id="preview-path"></dd>
+        <dt>最近更新</dt><dd id="preview-date"></dd>
+      </dl>
+    </section>
+  </div>
+  <div class="picker-footer">
+    <div>
+      <p id="picker-note">消息与回复会写入所选的 Codex 原会话。</p>
+      <p id="picker-error" role="alert"></p>
+    </div>
+    <button type="button" class="primary" id="use-thread" disabled>使用此会话</button>
+  </div>
+</dialog><dialog id="group-dialog">
+<form id="new-group">
+  <div class="dialoghead"><h2 id="group-editor-title">新建群聊</h2><button class="dialog-close" type="button" id="close-group" aria-label="关闭新建群聊">×</button></div>
+  <label>群名称<input id="group-name" required maxlength="40" placeholder="例如 论文讨论"></label>
+  <p id="group-error" role="alert"></p>
+  <button id="submit-group" class="primary">创建群聊</button>
+</form>
+</dialog><dialog id="settings" aria-labelledby="settings-title">
+  <div class="dialoghead"><h2 id="settings-title">成员设置</h2><button class="dialog-close" type="button" id="close-settings" aria-label="关闭设置">×</button></div>
+  <div class="settings-scroll" tabindex="0">
+  <section class="settings-section" aria-labelledby="member-profile-heading">
+  <h3 id="member-profile-heading">群内资料</h3>
+  <form id="rename-agent" class="rename-agent">
+    <label>群内名称<input id="rename-name" required maxlength="16" autocomplete="off"></label>
+    <button class="primary save-button" id="rename-save">改名</button>
+  </form>
+  <p id="rename-status" role="status"></p>
+  <div class="profile-form">
+    <div class="profile-avatar-row">
+      <span id="profile-avatar-preview"></span>
+      <div class="profile-avatar-tools">
+        <button id="pick-avatar" type="button">更换头像</button>
+        <button id="clear-avatar" type="button">恢复默认头像</button>
+        <input id="profile-avatar-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <small id="profile-avatar-status" role="status"></small>
+      </div>
+    </div>
+    <form id="member-color-form">
+    <fieldset class="profile-colors">
+      <legend>成员颜色</legend>
+      <div id="profile-color-options" class="profile-color-options"></div>
+      <div class="profile-color-row">
+        <label for="profile-color">自定义色值</label>
+        <input id="profile-color" maxlength="7" placeholder="#4477AA" autocomplete="off" spellcheck="false">
+        <button id="clear-profile-color" type="button">恢复默认颜色</button>
+      </div>
+    </fieldset>
+    <div class="save-row"><small id="profile-color-status" class="save-status" role="status"></small><button class="primary save-button" id="save-profile-color" type="submit">保存颜色</button></div>
+    </form>
+    <form id="member-personality-form">
+      <label>性格与沟通风格<textarea id="profile-personality" rows="2" maxlength="1000" placeholder="例如 严谨直接，先给结论，遇到不确定的证据就追问"></textarea></label>
+      <div class="save-row"><small id="profile-personality-status" class="save-status" role="status"></small><button class="primary save-button" id="save-personality" type="submit">保存性格</button></div>
+    </form>
+  </div>
+  </section>
+  <section class="settings-section" aria-labelledby="member-chat-heading">
+  <h3 id="member-chat-heading">Codex 会话地址</h3>
+  <div class="member-chat-row">
+    <p id="bound-thread-title" class="settings-note"></p>
+    <button type="button" id="change-member-thread">选择会话</button>
+  </div>
+  <form id="member-placement" class="rename-agent" hidden>
+    <label>首次创建到<select id="member-project" disabled><option value="">独立聊天</option></select></label>
+    <button class="primary save-button" id="member-project-save" disabled>保存项目</button>
+  </form>
+  <p id="member-project-status" role="status"></p>
+  </section>
+  <section class="settings-section" aria-labelledby="member-run-heading">
+  <h3 id="member-run-heading">Codex 运行设置</h3>
+  <p class="settings-note">此处保存模型、推理强度、权限和插件，应用于该成员之后的群聊任务。</p>
+  <div class="settings-grid">
+    <label>模型<select id="model"></select></label>
+    <label>推理强度<select id="effort"></select></label>
+    <label>权限<select id="permission"></select></label>
+  </div>
+  <details class="plugin-settings"><summary>已安装插件</summary>
+    <label><input type="checkbox" id="custom-plugins">为该成员配置插件</label>
+    <div id="plugin-list"></div>
+  </details>
+  <div class="save-row"><p id="settings-status" class="save-status" role="status"></p><button type="button" id="reset-settings">沿用会话设置</button><button type="button" class="primary save-button" id="apply-settings" disabled>保存运行设置</button></div>
+  </section>
+  </div>
+</dialog>
+<dialog id="skill-dialog" aria-labelledby="skill-title">
+  <div class="dialoghead"><h2 id="skill-title">调用 Skill</h2><button class="dialog-close" type="button" id="close-skill" aria-label="关闭 Skill 选择">×</button></div>
+  <fieldset class="skill-recipients">
+    <legend>执行成员</legend>
+    <div class="skill-recipient-row"><div id="skill-members"></div><button type="button" id="skill-all">全选</button></div>
+  </fieldset>
+  <label>搜索 Skill<input id="skill-search" type="search" placeholder="按名称或用途搜索" autocomplete="off"></label>
+  <div id="skill-list" role="group" aria-label="可选 Skill"></div>
+  <p class="settings-note">只显示所选成员都能使用的 Skill。消息也会发给正文中点名的成员。</p>
+  <p id="skill-status" role="status"></p>
+  <div class="settings-actions"><button type="button" class="primary" id="apply-skill" disabled>添加到消息</button></div>
+</dialog><dialog id="organization" aria-labelledby="org-title">
+  <div class="dialoghead"><h2 id="org-title">群成员</h2><div class="header-actions"><button type="button" id="invite">添加成员</button><button class="dialog-close" type="button" id="org-close" aria-label="关闭群成员">×</button></div></div>
+  <p id="member-management-error" role="alert"></p>
+  <section id="org-workspace" aria-labelledby="org-heading">
+  <h3 id="org-heading" class="member-section-title">组织架构</h3>
+  <div class="org-toolbar">
+    <p id="org-status" role="status">点击上级下方圆点，再点下属上方圆点。</p>
+    <label><input type="checkbox" id="org-history">显示已结束的子 Agent</label>
+    <button type="button" id="org-cancel" hidden>取消连线</button>
+  </div>
+  <div class="org-viewport" tabindex="0" role="region" aria-label="组织架构画布，可横向滚动">
+    <div class="org-canvas">
+      <svg id="org-lines" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="org-levels" aria-label="管理层级"></div>
+    </div>
+  </div>
+  <div id="org-details" aria-label="选中 Agent 详情"></div>
+  </section>
+  <section id="member-panel" aria-labelledby="member-list-heading">
+    <h3 id="member-list-heading" class="member-section-title">成员列表</h3>
+    <div id="members"></div>
+  </section>
+</dialog>
+<dialog id="tasks-dialog" aria-labelledby="tasks-title">
+  <div class="dialoghead"><h2 id="tasks-title">群公告</h2><button class="dialog-close" id="close-tasks" type="button" aria-label="关闭群公告">×</button></div>
+  <div id="task-cards"></div>
+  <button id="new-task" class="primary" type="button">新建群公告</button>
+</dialog>
+<dialog id="task-editor" aria-labelledby="task-editor-title">
+  <form id="task-form">
+    <div class="dialoghead"><h2 id="task-editor-title">新建群公告</h2><button class="dialog-close" id="close-task-editor" type="button" aria-label="关闭公告编辑">×</button></div>
+    <label>公告标题<input id="task-title" maxlength="80" required></label>
+    <label>必须遵守<textarea id="task-requirements" rows="4" maxlength="6000" required placeholder="例如 保留实习经历，最终交付一页 PDF"></textarea></label>
+    <label>参考资料<textarea id="task-reference" rows="2" maxlength="4000" placeholder="填写文件、链接或补充说明"></textarea></label>
+    <p id="task-editor-source"></p>
+    <div class="save-row"><p id="task-error" class="save-status" role="alert"></p><button id="save-task" class="primary save-button" type="submit">保存群公告</button></div>
+  </form>
+</dialog>
+<dialog id="group-settings" aria-labelledby="group-settings-title">
+  <div class="dialoghead"><h2 id="group-settings-title">群设置</h2><button class="dialog-close" id="close-group-settings" type="button" aria-label="关闭群设置">×</button></div>
+  <div class="settings-scroll" tabindex="0">
+  <section class="settings-section" aria-labelledby="group-avatar-heading">
+    <h3 id="group-avatar-heading">群头像</h3>
+    <div class="profile-avatar-row">
+      <span id="group-avatar-preview"></span>
+      <div class="profile-avatar-tools">
+        <button id="pick-group-avatar" type="button">更换群头像</button>
+        <button id="clear-group-avatar" type="button">恢复默认</button>
+        <input id="group-avatar-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <small id="group-avatar-status" role="status"></small>
+      </div>
+    </div>
+  </section>
+  <form id="group-settings-form" class="settings-section" aria-labelledby="group-display-heading">
+    <h3 id="group-display-heading">聊天显示</h3>
+    <div class="font-setting">
+      <div class="font-setting-label">
+        <span id="chat-font-label">聊天字号</span>
+        <div class="font-stepper" role="group" aria-labelledby="chat-font-label">
+          <button id="decrease-chat-font" type="button" aria-label="缩小聊天字号">−</button>
+          <output id="chat-font-value" for="decrease-chat-font increase-chat-font">14 px</output>
+          <button id="increase-chat-font" type="button" aria-label="放大聊天字号">+</button>
+        </div>
+      </div>
+      <div id="chat-font-preview" class="chat-font-preview" aria-label="聊天字号预览">
+        <div class="msg msg-agent"><article><div class="meta">Agent<small>10:24</small></div><div class="body">这是聊天字号预览。</div></article></div>
+      </div>
+    </div>
+    <label class="group-setting-toggle"><input id="show-agent-interactions" type="checkbox"><span>显示 Agent 协作过程</span></label>
+    <p class="settings-note">关闭后，主聊天保留最终回复和贡献成员。派工、下属回传和中间进度可以随时重新显示。</p>
+    <div class="save-row"><p id="group-settings-status" class="save-status" role="alert"></p><button id="save-group-settings" class="primary save-button" type="submit">保存显示设置</button></div>
+  </form>
+  </div>
+</dialog>
+<dialog id="archived-groups" aria-labelledby="archived-groups-title">
+  <div class="dialoghead"><h2 id="archived-groups-title">已归档群聊</h2><button class="dialog-close" id="close-archived-groups" type="button" aria-label="关闭已归档群聊">×</button></div>
+  <div id="archived-group-list"></div>
+  <p id="archived-groups-error" role="alert"></p>
+</dialog>
+<dialog id="remove-message" aria-labelledby="remove-message-title">
+  <div class="dialoghead"><h2 id="remove-message-title">移除消息</h2><button class="dialog-close" id="close-remove-message" type="button" aria-label="关闭移除消息">×</button></div>
+  <p>仅移除会隐藏这条消息，并从今后补发的群聊上下文里排除。已经进入 Codex 会话的内容仍在原会话里。</p>
+  <p>重置上下文会让全群成员下次从新会话开始。旧对话可在 Codex 查看，先前的待重试请求会清除。</p>
+  <p id="remove-message-error" role="alert"></p>
+  <div class="settings-actions"><button id="hide-message" type="button">仅移除</button><button id="reset-message" class="primary" type="button">移除并重置上下文</button></div>
+</dialog>
+<script src="/ui.js?v=rallumi-identity" type="module"></script></body></html>

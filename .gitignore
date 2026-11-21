@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.env.*
+.local/
+*.sqlite
+*.sqlite-*
+node_modules/
+plugins/rallumi/.mcp.json

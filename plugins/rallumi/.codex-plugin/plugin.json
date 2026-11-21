@@ -1,0 +1,19 @@
+{
+  "name": "rallumi",
+  "version": "0.3.2",
+  "description": "Open your local Rallumi agent chats.",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Rallumi",
+    "shortDescription": "Open local Rallumi group chats",
+    "longDescription": "View and manage local agent group chats from the Codex sidebar.",
+    "developerName": "Rallumi",
+    "category": "Productivity",
+    "brandColor": "#4a36e8",
+    "composerIcon": "./assets/rallumi-symbol.png",
+    "logo": "./assets/rallumi-symbol.png",
+    "capabilities": [
+      "Interactive"
+    ]
+  }
+}

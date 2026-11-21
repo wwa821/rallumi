@@ -1,0 +1,12 @@
+{
+  "name": "rallumi-preview",
+  "interface": { "displayName": "Rallumi Preview" },
+  "plugins": [
+    {
+      "name": "rallumi",
+      "source": { "source": "local", "path": "./plugins/rallumi" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}
