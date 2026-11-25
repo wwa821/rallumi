@@ -1,7 +1,7 @@
 import { t, diagnostic, language, setLanguage } from './i18n.js';
 import { copyText, flashButtonLabel, markdownBody } from './markdown.js?v=group-management';
 import { mountOrganization } from './organization.js?v=layered-layout';
-import { everyoneMention } from './mentions.js';
+import { everyoneMention, searchRank } from './mentions.js';
 const $=id=>document.getElementById(id);
 const productName=$('product-name').textContent;
 const transport=globalThis.rallumiTransport;
@@ -11,8 +11,8 @@ let stream, selectedThread = null, previewThread = null, groupKey = '';
 let groupAvatarDraft, groupMenuTarget, groupEditTarget, removeMessageTarget;
 let chatFontDraft=14;
 const drafts = new Map();
-const pendingSentMotion = new Set();
-const thinkingStages = new Set(['等待模型回复','模型推理中']);
+const repliesByRoom = new Map();
+const pendingSends = new Map();
 const attachmentsByRoom = new Map();
 const skillsByRoom = new Map();
 const tasksByRoom = new Map();
@@ -33,6 +33,7 @@ function updateLanguage(value) {
   setNewMessageCount(newMessageCount);
 }
 let historyDay = '', newMessageCount = 0;
+let stopping=false;
 let state, connected=false, sending=false, historyCount=-1, memberKey='', appearanceKey='', searchEpoch=0, cursor, searchTimer;
 async function api(route,data,id=roomId){
   const url = new URL('/api/'+route,location.origin==='null' ? 'http://127.0.0.1:4317' : location.origin);
@@ -91,13 +92,14 @@ function groupAvatar(group) {
   return node;
 }
 let mentionOptions=[], mentionIndex=0, mentionRange=null, avatarClickTimer;
+let composingMessage=false;
 function messageMentions(text) {
-  return [...text.matchAll(/@([\p{L}\p{N}_-]+)/gu)].map(match=>match[1]);
+  return [...text.matchAll(/[@＠]([\p{L}\p{N}_-]+)/gu)].map(match=>match[1]);
 }
 function mentionAtCaret(input) {
   if (input.selectionStart!==input.selectionEnd) return null;
   const caret=input.selectionStart;
-  const match=input.value.slice(0,caret).match(/@([\p{L}\p{N}_-]*)$/u);
+  const match=input.value.slice(0,caret).replaceAll('＠','@').match(/@([\p{L}\p{N}_-]*)$/u);
   if (!match) return null;
   const tail=input.value.slice(caret).match(/^[\p{L}\p{N}_-]*/u)[0];
   return {start:caret-match[0].length,end:caret+tail.length,query:match[1],name:match[1]+tail};
@@ -143,6 +145,7 @@ function chooseMention(name) {
   if (mentionRange) mention(name);
 }
 function showMentions() {
+  if (composingMessage) return;
   const input=$('message'), list=$('mention-list');
   mentionRange=mentionAtCaret(input);
   if (!state?.members.length || !mentionRange) return closeMentions();
@@ -150,12 +153,7 @@ function showMentions() {
   const names=state.members.map(member=>member.name);
   const alias=everyoneMention('All',names) && (query ? 'all'.startsWith(query) : language==='en') ? 'All' : '全体';
   const candidates=[{name:alias,role:t('发送给当前群的所有成员')},...state.members]
-    .map(member=>{
-      const name=member.name.toLocaleLowerCase();
-      const rank=name===query ? 0 : name.startsWith(query) ? 1 : name.includes(query) ? 2
-        : member.role?.toLocaleLowerCase().includes(query) ? 3 : Infinity;
-      return {member,rank};
-    })
+    .map(member=>({member,rank:searchRank(query,member.name,member.role)}))
     .filter(({rank})=>Number.isFinite(rank))
     .sort((a,b)=>a.rank-b.rank)
     .map(({member})=>member);
@@ -248,6 +246,23 @@ function settingsAvatar(name) {
   button.append(icon);
   return button;
 }
+function appendActivityRing(button) {
+  if (!button?.classList.contains('avatar-button')) return;
+  const namespace='http://www.w3.org/2000/svg';
+  const ring=document.createElementNS(namespace,'svg');
+  ring.setAttribute('class','avatar-activity');
+  ring.setAttribute('viewBox','0 0 40 40');
+  ring.setAttribute('aria-hidden','true');
+  for (const className of ['activity-track','activity-progress']) {
+    const outline=document.createElementNS(namespace,'rect');
+    for (const [key,value] of Object.entries({x:1.5,y:1.5,width:37,height:37,rx:11,pathLength:100})) {
+      outline.setAttribute(key,value);
+    }
+    outline.setAttribute('class',className);
+    ring.append(outline);
+  }
+  button.append(ring);
+}
 function row(name,text,note,attachments = [],skill,contributors=[]){
   if(name==='系统')return el('p','system',diagnostic(text));
   const line=el('div',name==='你'?'msg msg-self':'msg msg-agent c'+memberColor(name)), a=el('article'), head=el('div','meta',name==='你' ? t('你') : name);
@@ -297,35 +312,49 @@ function controls(){
   const draft=$('message').value;
   const skill=skillsByRoom.get(roomId);
   const hasDraft=!!(draft.trim() || draftFiles().length || skill);
-  const unfinishedMention=/@\s*$/u.test(draft);
+  const unfinishedMention=/[@＠]\s*$/u.test(draft);
   const refs=messageMentions(draft);
   const names=state?.members.map(member=>member.name) || [];
   const isEveryone = name => everyoneMention(name,names);
   const unknown=refs.find(name=>!isEveryone(name) && !names.includes(name));
+  const replyTo=repliesByRoom.get(roomId);
+  const quoted=replyTo && state?.messages.find(message=>message.id===replyTo);
+  const targets=[...new Set([...refs,...(skill?.targets || [])])];
+  const needsRecipient=!!(quoted && !targets.length && !names.includes(quoted.author));
+  if (quoted && !targets.length && !needsRecipient) targets.push(quoted.author);
   const summary=$('send-targets');
   if (hasDraft && state?.members.length) {
-    const targets=[...new Set([...refs,...(skill?.targets || [])])];
     const all=!targets.length || refs.some(isEveryone);
     const recipients=all ? names : targets;
     const waiting=state.active.filter(entry=>recipients.includes(entry.name)).length;
-    summary.textContent=unfinishedMention ? t('请选择 @ 成员') : unknown ? t('未识别的成员 @{0}',unknown)
+    summary.textContent=replyTo && !state.discussionControls ? t('请重新打开 Codex 以使用新版引用回复') : needsRecipient ? t('请先选择引用回复的收件人') : unfinishedMention ? t('请选择 @ 成员') : unknown ? t('未识别的成员 @{0}',unknown)
       : (all ? t('发给全体（{0} 位）',names.length) : t('发给 {0}',targets.join(language==='en' ? ', ' : '、')))+
         (!state.paused && waiting ? t(' · {0} 位将排队',waiting) : '');
   } else summary.textContent='';
   summary.title=summary.textContent;
   $('send').textContent=sending ? t('发送中') : t('发送');
-  $('send').disabled=!connected || state?.managing || state?.paused || !state?.members.length || sending || !hasDraft || unfinishedMention || !!unknown;
+  $('send').disabled=!connected || state?.managing || state?.paused || !state?.members.length || sending || !hasDraft || unfinishedMention || !!unknown || needsRecipient || !!(replyTo && (!quoted || !state?.discussionControls)) || stopping;
   $('open-group-settings').disabled = !connected || !roomId;
   $('open-tasks').disabled = !connected || !roomId;
   $('open-organization').disabled = !connected || !roomId;
   $('pick-skill').disabled = !connected || !state?.members.length;
-  $('pause').disabled=!connected || !roomId || !!state?.managing;
+  if ($('guide').open) updateGuide();
+  $('pause').disabled=!connected || !roomId || !!state?.managing || stopping;
+  $('stop-discussion').hidden=!state?.discussionControls || !(state.paused || state.active.length || state.retries?.length);
+  $('stop-discussion').disabled=!connected || !roomId || !!state?.managing || stopping;
 }
 function animateSentMessage(row) {
-  const bubble=row.querySelector('.body:not(:empty)');
+  const bubble=row.querySelector('.body:not(:empty)') || row.querySelector('article');
   if (!bubble) return;
   bubble.classList.add('sent-arrival');
   bubble.addEventListener('animationend',()=>bubble.classList.remove('sent-arrival'),{once:true});
+}
+function renderPendingSend() {
+  const container=$('pending-send');
+  const pending=pendingSends.get(roomId);
+  if (pending && container.firstElementChild===pending.entry) return;
+  container.replaceChildren(...(pending ? [pending.entry] : []));
+  $('empty').hidden=!!(state?.messages.length || pending || !connected);
 }
 function nearLatest(scroll) {
   return scroll.scrollHeight-scroll.scrollTop-scroll.clientHeight<90;
@@ -352,12 +381,14 @@ function visibleMessage(snapshot,message) {
 function render(s){
   if (!savingLanguage && s.language && s.language!==language) updateLanguage(s.language);
   state=s;
+  renderReplyDraft();
   document.querySelector('.chat').style.setProperty('--chat-font-size',(s.chatFontSize ?? 14)+'px');
   renderTasks();
   organization.update(s);
   const sc=$('scroll'),stick=nearLatest(sc);
   const live=$('live');
   const previous=new Map([...live.children].map(line=>[line.dataset.member,line]));
+  const historyCountBeforeRender=historyCount;
   const appended=historyCount<0 ? [] : s.messages.slice(historyCount);
   const incoming=appended.filter(message=>message.author!=='你' && message.author!=='系统' && visibleMessage(s,message));
   const unanimatedReplies=new Set(incoming.map(message=>message.id));
@@ -441,9 +472,17 @@ function render(s){
     const entry = row(msg.author,message,time,msg.attachments,msg.skill,msg.contributors);
     entry.id='message-'+msg.id;
     const prior=previous.get(msg.author);
-    if (unanimatedReplies.has(msg.id) && msg.text && prior?.classList.contains('msg-thinking')) {
+    if (unanimatedReplies.has(msg.id) && prior?.dataset.hasReply!=='true') {
       entry.querySelector('article').classList.add('reply-arrival');
-      prior.classList.remove('msg-thinking');
+    }
+    if (msg.replyTo) {
+      const article=entry.querySelector('article');
+      const source=s.messages.find(message=>message.id===msg.replyTo);
+      const quote=el('button','quoted-message',quoteLabel(source));
+      quote.type='button';
+      quote.disabled=!source || !visibleMessage(s,source);
+      quote.onclick=()=>jumpToQuote(msg.replyTo);
+      article.querySelector('.body').before(quote);
     }
     if (msg.author!=='系统') entry.querySelector('article').append(messageActions(msg,s.roomId));
     if (lockNotice) {
@@ -486,13 +525,12 @@ function render(s){
   }
   const retries = new Set(s.retries || []);
   for (const actions of $('history').querySelectorAll('[data-retry]')) actions.hidden=!retries.has(actions.dataset.retry);
-  historyCount=s.messages.length;$('empty').hidden=!!s.messages.length;
-  for (const messageId of pendingSentMotion) {
-    const row=$('message-'+messageId);
-    if (!row) continue;
-    pendingSentMotion.delete(messageId);
-    animateSentMessage(row);
+  historyCount=s.messages.length;
+  const pending=pendingSends.get(s.roomId);
+  if (pending && s.messages.some(msg=>msg.clientSendId===pending.clientSendId || msg.id===pending.messageId)) {
+    pendingSends.delete(s.roomId);
   }
+  renderPendingSend();
   const active=shownActivity(s);
   for (const [index,a] of active.entries()) {
     const updated=row(a.name,a.text,diagnostic(a.activity)+(a.queued?t(' · 排队 {0} 条',a.queued):''));
@@ -527,7 +565,7 @@ function render(s){
     const line=saved?.dataset.appearance===appearance ? saved : updated;
     line.dataset.appearance=appearance;
     const sameTurn=saved?.dataset.startedAt===String(a.startedAt);
-    const firstReply=sameTurn && !a.native && !!a.text && saved.dataset.hasReply==='false';
+    const firstReply=historyCountBeforeRender>=0 && !a.native && !!a.text && (!sameTurn || saved.dataset.hasReply==='false');
     const article=line.lastElementChild;
     if (line!==updated) article.replaceChildren(...updated.lastElementChild.childNodes);
     if (!sameTurn) article.classList.remove('reply-arrival');
@@ -535,7 +573,8 @@ function render(s){
     line.dataset.member=a.name;
     line.dataset.startedAt=String(a.startedAt);
     line.dataset.hasReply=String(!!a.text);
-    line.classList.toggle('msg-thinking',thinkingStages.has(a.activity) && !a.native);
+    line.classList.toggle('msg-thinking',!a.native || a.activity==='Codex 原会话正在处理');
+    if (line===updated) appendActivityRing(line.querySelector('.avatar-button'));
     if (live.children[index]!==line) live.insertBefore(line,live.children[index] || null);
   }
   while (live.children.length>active.length) live.lastElementChild.remove();
@@ -745,10 +784,35 @@ $('app-language').onchange=async event=>{
     select.disabled=false;
   }
 };
-$('open-guide').onclick=()=>{
-  const coordinator=state?.members.find(member=>member.name==='Coordinator' || member.name==='统筹')?.name || 'Coordinator';
-  $('guide-example').textContent=t('@{0} 我想做一份产品试用计划，帮我列出三个步骤。',coordinator);
+function updateGuide() {
+  const members=state?.members || [];
+  const recipient=members.find(member=>['Coordinator','统筹'].includes(member.name)) || members[0];
+  const example=$('guide-example');
+  const hasDraft=!!($('message').value.trim() || draftFiles().length || skillsByRoom.has(roomId) || repliesByRoom.has(roomId));
+  example.hidden=!recipient;
+  example.textContent=recipient ? t('@{0} 用三句话介绍你能帮我做什么。',recipient.name) : '';
+  $('guide-insert').disabled=!connected || !recipient || hasDraft;
+  $('guide-example-status').textContent=!recipient ? t('先打开有成员的群聊，再试用示例。')
+    : hasDraft ? t('输入框里已有草稿，可以直接编辑当前草稿。') : '';
+  $('guide-members').disabled=!connected || !roomId;
+}
+$('open-guide').onclick=$('empty-guide').onclick=()=>{
+  updateGuide();
   $('guide').showModal();
+};
+$('guide-insert').onclick=()=>{
+  updateGuide();
+  if ($('guide-insert').disabled) return;
+  const input=$('message');
+  input.value=$('guide-example').textContent;
+  $('guide').close();
+  input.focus({preventScroll:true});
+  controls();
+};
+$('guide-members').onclick=()=>{
+  if ($('open-organization').disabled) return;
+  $('guide').close();
+  $('open-organization').click();
 };
 $('close-guide').onclick=()=>$('guide').close();
 $('open-group-settings').onclick=()=>{
@@ -777,11 +841,11 @@ $('group-settings-form').onsubmit=async event=>{
 function openGroup(id, {openMembers=false}={}) {
   if (stream) drafts.set(roomId, $('message').value);
   stream?.close();
-  pendingSentMotion.clear();
   setNewMessageCount(0);
   roomId = id;
   connected = false;
   state = null;
+  renderReplyDraft();
   historyCount = -1;
   closeMentions();
   closeGroupMenu();
@@ -801,6 +865,7 @@ function openGroup(id, {openMembers=false}={}) {
   $('empty').hidden = true;
   for (const section of ['history','live','approvals','members']) $(section).replaceChildren();
   $('organization').close();
+  renderPendingSend();
   controls();
   if (!transport) {
     const url = new URL(location.href);
@@ -915,6 +980,31 @@ $('new-group').onsubmit = async event => {
   } catch (error) { $('group-error').textContent = diagnostic(error.message); }
   finally { submit.disabled = false; }
 };
+function quoteLabel(message) {
+  if (!message) return t('引用消息已不可用');
+  const text = message.text?.replace(/\s+/g,' ').trim() ||
+    message.attachments?.map(file=>file.name).join(', ') || t('消息');
+  return (message.author==='你' ? t('你') : message.author)+' · '+text.slice(0,180);
+}
+function renderReplyDraft() {
+  const draft=$('reply-draft');
+  const target=repliesByRoom.get(roomId);
+  draft.hidden=!target;
+  if (!target) return;
+  const source=state?.messages.find(message=>message.id===target);
+  $('reply-preview').textContent=quoteLabel(source);
+}
+function jumpToQuote(id) {
+  const target=$('message-'+id);
+  if (!target) return;
+  target.scrollIntoView({block:'center'});
+  target.querySelector('article')?.animate?.([{opacity:.55},{opacity:1}],{duration:420});
+}
+$('cancel-reply').onclick=()=>{
+  repliesByRoom.delete(roomId);
+  renderReplyDraft();
+  $('message').focus();
+};
 function messageActions(message,id) {
   const actions=el('div','message-icon-actions');
   const copy=el('button','message-action-icon copy-message');
@@ -940,7 +1030,16 @@ function messageActions(message,id) {
     $('remove-message-error').textContent='';
     $('remove-message').showModal();
   };
-  actions.append(copy,remove);
+  const reply=el('button','message-action-icon reply-message','↩');
+  reply.type='button';
+  reply.title=t('引用回复');
+  reply.setAttribute('aria-label',reply.title);
+  reply.onclick=()=>{
+    repliesByRoom.set(id,message.id);
+    renderReplyDraft();
+    $('message').focus({preventScroll:true});
+  };
+  actions.append(reply,copy,remove);
   if (message.author==='你' || message.taskId) {
     const label=message.taskId ? t('查看群公告') : t('设为群公告');
     const notice=el('button','message-action-icon notice-message-icon');
@@ -1048,25 +1147,41 @@ $('message').onpaste = event => {
   addFiles(files);
 };
 $('compose').onsubmit=async e=>{
-  e.preventDefault();if($('send').disabled)return;
+  e.preventDefault();if(composingMessage || $('send').disabled)return;
   const id=roomId, draft=$('message').value, entries=[...draftFiles(id)], skill=skillsByRoom.get(id), taskId=tasksByRoom.get(id);
-  const connection=stream;
+  const replyTo=repliesByRoom.get(id);
+  const clientSendId=Array.from(crypto.getRandomValues(new Uint32Array(4)),part=>part.toString(16).padStart(8,'0')).join('');
+  const entry=row('你',draft,t('发送中'),[],skill);
+  const article=entry.querySelector('article');
+  const quoted=replyTo && state?.messages.find(message=>message.id===replyTo);
+  if (quoted) article.querySelector('.body').before(el('span','quoted-message',quoteLabel(quoted)));
+  if (entries.length) article.querySelector('.body').append(el('div','pending-file-names',entries.map(item=>item.file.name).join(', ')));
+  const pending={entry,clientSendId};
+  pendingSends.set(id,pending);
   sending=true;controls();$('error').textContent='';
+  renderPendingSend();
+  animateSentMessage(entry);
+  $('scroll').scrollTop=$('scroll').scrollHeight;
   try {
     const attachments = [];
     for (const entry of entries) attachments.push(await upload(entry,id));
-    const {messageId}=await api('message',{text:draft,attachments,skill,taskId},id);
-    if (stream===connection && Number.isInteger(messageId)) {
-      const row=$('message-'+messageId);
-      if (row) animateSentMessage(row);
-      else pendingSentMotion.add(messageId);
+    const {messageId}=await api('message',{text:draft,attachments,skill,taskId,replyTo,clientSendId},id);
+    pending.messageId=messageId;
+    if (!Number.isInteger(messageId) || (roomId===id && state?.messages.some(msg=>msg.id===messageId))) {
+      pendingSends.delete(id);
+      renderPendingSend();
     }
     attachmentsByRoom.set(id,draftFiles(id).filter(entry=>!entries.includes(entry)));
     if (roomId===id && $('message').value===draft) $('message').value='';
     else if(drafts.get(id)===draft) drafts.delete(id);
+    if (repliesByRoom.get(id)===replyTo) repliesByRoom.delete(id);
+    renderReplyDraft();
     if (skillsByRoom.get(id)===skill) skillsByRoom.delete(id);
     renderDraftFiles();
-  } catch(e){fail(e);}finally{sending=false;controls();}
+  } catch(e){
+    pendingSends.delete(id);
+    if (roomId===id) { renderPendingSend();fail(e); }
+  }finally{sending=false;controls();}
 };
 function optionsInto(id, items, fallback, value) {
   const select = $(id);
@@ -1391,16 +1506,14 @@ function skillMembers() {
   return [...$('skill-members').querySelectorAll('input:checked')].map(input=>input.value);
 }
 function renderSkillResults() {
-  const words = $('skill-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const results = skillOptions.filter(skill=>{
-    const text = (skill.name+' '+(skill.description || '')).toLowerCase();
-    return words.every(word=>text.includes(word));
-  });
+  const query = $('skill-search').value.trim();
+  const results = skillOptions.map(skill=>({skill,rank:searchRank(query,skill.name,skill.description)}))
+    .filter(({rank})=>Number.isFinite(rank)).sort((a,b)=>a.rank-b.rank).map(({skill})=>skill);
   const targets = skillMembers();
   $('skill-status').textContent = skillLoading ? t('正在读取可用 Skill…')
     : skillError || (!targets.length ? t('先选择执行成员')
     : results.length ? t('找到 {0} 个可用 Skill',results.length)
-    : words.length ? t('没有匹配的 Skill') : t('所选成员没有共同可用的 Skill'));
+    : query ? t('没有匹配的 Skill') : t('所选成员没有共同可用的 Skill'));
   const rows = document.createDocumentFragment();
   for (const skill of results) {
     const label = el('label','skill-result');
@@ -1488,18 +1601,37 @@ $('apply-skill').onclick = () => {
   controls();
   $('skill-dialog').close();
 };
+$('message').addEventListener('compositionstart',()=>{
+  composingMessage=true;
+  closeMentions();
+});
 $('message').oninput = event => {
+  if (composingMessage || event.isComposing) return;
   controls();
-  if (!event.isComposing) showMentions();
+  showMentions();
 };
-$('message').oncompositionend = showMentions;
+$('message').addEventListener('compositionend',()=>{
+  composingMessage=false;
+  controls();
+  showMentions();
+});
 $('message').onclick = showMentions;
-$('message').onblur = closeMentions;
+$('message').onblur = () => {
+  composingMessage=false;
+  closeMentions();
+};
 $('message').onkeyup = event => {
-  if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key) && !event.isComposing) showMentions();
+  if (composingMessage || event.isComposing || event.keyCode===229) {
+    event.stopPropagation();
+    return;
+  }
+  if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) showMentions();
 };
 $('message').onkeydown = event => {
-  if (event.isComposing || event.keyCode===229) return;
+  if (composingMessage || event.isComposing || event.keyCode===229) {
+    event.stopPropagation();
+    return;
+  }
   if (!$('mention-list').hidden) {
     if (event.key==='Escape') { event.preventDefault(); closeMentions(); return; }
     if (mentionOptions.length && ['ArrowDown','ArrowUp'].includes(event.key)) {
@@ -1521,13 +1653,28 @@ $('mention-open').onclick = () => {
   const input=$('message');
   input.focus();
   const prefix=input.value.slice(0,input.selectionStart);
-  if (!/@[\p{L}\p{N}_-]*$/u.test(prefix)) {
+  if (!/[@＠][\p{L}\p{N}_-]*$/u.test(prefix)) {
     input.setRangeText(prefix && !/\s$/.test(prefix) ? ' @' : '@',input.selectionStart,input.selectionEnd,'end');
   }
   showMentions();
   controls();
 };
 $('pause').onclick=()=>api('pause',{paused:!state.paused}).catch(fail);
+$('stop-discussion').onclick=async()=>{
+  const id=roomId;
+  stopping=true;
+  controls();
+  try {
+    await api('pause',{stop:true},id);
+    if (roomId===id && state) {
+      state={...state,paused:false};
+      $('status').textContent='';
+      $('pause').textContent=t('暂停讨论');
+      $('message').focus({preventScroll:true});
+    }
+  } catch(error) { fail(error); }
+  finally { stopping=false;controls(); }
+};
 $('invite').onclick=()=>{ $('dialog').showModal(); if ($('source').value==='new') void loadProjects(); };$('close').onclick=()=>$('dialog').close();
 const conversationGroups = new Map();
 const seenThreads = new Set();

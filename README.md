@@ -4,7 +4,7 @@
 
 Rallumi is built on Codex. Open it inside the desktop app, connect an existing Codex conversation to a group member, and give that member work using the context it already has.
 
-[Download the macOS preview](https://github.com/wwa821/rallumi/releases/tag/v0.1.0)
+[Download the macOS preview](https://github.com/wwa821/rallumi/releases/tag/v0.2.0)
 
 ![Three steps: link the existing Product launch brief in Codex, delegate research and review in Rallumi, and continue the same Codex conversation with the finished draft](docs/images/codex-workflow.png)
 

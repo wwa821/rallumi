@@ -360,7 +360,7 @@ const server=http.createServer(async(req,res)=>{
           if (!skill) throw Error('所选成员已无法共同使用这个 Skill，请重新选择');
           skillTargets=[...new Set(targets)];
         }
-        const messageId=room.post(msg,{attachments,skill,skillTargets,taskId:b.taskId});
+        const messageId=room.post(msg,{attachments,skill,skillTargets,taskId:b.taskId,replyTo:b.replyTo,clientSendId:typeof b.clientSendId==='string' && /^[0-9a-f]{32}$/.test(b.clientSendId) ? b.clientSendId : undefined});
         return json(200,{ok:true,messageId});
       }
       case '/api/member': {
@@ -375,7 +375,10 @@ const server=http.createServer(async(req,res)=>{
         room.join(String(b.name||'').trim(), String(b.role||'项目协作').slice(0,300), b.thread||null,location);
         break;
       }
-      case '/api/pause': room.pause(b.paused===true);break;
+      case '/api/pause':
+        if (b.stop===true) room.stopDiscussion();
+        else room.pause(b.paused===true);
+        break;
       case '/api/approval': room.decide(b.id,b.allow===true);break;
       default:return json(404,{error:'未找到'});
     }
@@ -403,11 +406,13 @@ server.listen(port,'127.0.0.1',()=>{
   for (const record of db.prepare("SELECT id FROM room WHERE EXISTS (SELECT 1 FROM json_each(data,'$.nativeQueue')) OR EXISTS (SELECT 1 FROM json_each(data,'$.handoffBatches'))").all()) openRoom(record.id);
   console.log('Agent 群聊 '+origin);
 });
-for (const sig of ['SIGTERM','SIGINT']) process.on(sig, () => {
+function stopService() {
   for (const room of rooms.values()) {
     for (const run of room.active.values()) run.rpc.child?.kill();
     room.rpc.child?.kill();
   }
   rpc.child?.kill();
   process.exit(0);
-});
+}
+for (const signal of ['SIGTERM','SIGINT']) process.on(signal,stopService);
+if (process.send) process.on('disconnect',stopService);

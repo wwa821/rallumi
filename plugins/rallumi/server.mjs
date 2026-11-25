@@ -1,9 +1,11 @@
+import { fork } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 
 const origin='http://127.0.0.1:4321';
 const tokenFile=process.env.RALLUMI_TOKEN_FILE;
-const resourceUri='ui://rallumi/preview-v3';
+const resourceUri='ui://rallumi/preview-v4';
 const mimeType='text/html;profile=mcp-app';
 const resource={uri:resourceUri,name:'Rallumi',mimeType};
 const icon={
@@ -43,6 +45,41 @@ const writes=new Set([
   'native-queue/cancel','native-queue/stop-sync','attachment'
 ]);
 
+let service, starting, closing=false;
+const serviceEntry=new URL('../../service/server.mjs',import.meta.url);
+async function ensureService(headers) {
+  async function healthy() {
+    try {
+      const response=await fetch(origin+'/api/health',{headers,signal:AbortSignal.timeout(700)});
+      return response.ok && (await response.json()).app==='rallumi-preview';
+    } catch { return false; }
+  }
+  if (await healthy()) return;
+  if (closing) throw Error('Plugin is closing');
+  starting ??= (async()=>{
+    if (!service) {
+      const child=fork(serviceEntry,[],{stdio:['ignore','ignore','inherit','ipc']});
+      service=child;
+      const cleared=()=>{if(service===child) service=undefined;};
+      child.once('exit',cleared);
+      child.once('error',cleared);
+    }
+    for(let attempt=0;attempt<40;attempt++) {
+      if (await healthy()) return;
+      await delay(100);
+    }
+    throw Error('Rallumi did not start');
+  })().finally(()=>{starting=undefined;});
+  await starting;
+}
+
+function stopService() {
+  closing=true;
+  service?.kill();
+}
+process.once('exit',stopService);
+for(const signal of ['SIGINT','SIGTERM']) process.once(signal,()=>process.exit(0));
+
 async function relay(args) {
   if (typeof args?.route!=='string' || !args.route.startsWith('/api/')) {
     throw rpcError(-32602,'无效的本机群聊路径');
@@ -65,6 +102,7 @@ async function relay(args) {
     options.body=args.binary ? Buffer.from(args.body || '','base64') : args.body;
   }
   try {
+    await ensureService(options.headers);
     const response=await fetch(target,options);
     const type=response.headers.get('content-type') || 'application/octet-stream';
     const binary=!type.startsWith('application/json');
@@ -86,7 +124,7 @@ async function handle(method,params={}) {
         protocolVersion:['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(params.protocolVersion)
           ? params.protocolVersion : '2025-11-25',
         capabilities:{tools:{},resources:{}},
-        serverInfo:{name:'rallumi',version:'0.3.2',icons:[icon]}
+        serverInfo:{name:'rallumi',version:'0.3.3',icons:[icon]}
       };
     case 'ping': return {};
     case 'tools/list': return {tools:[tool,bridge]};
@@ -97,7 +135,7 @@ async function handle(method,params={}) {
     case 'resources/list': return {resources:[resource]};
     case 'resources/templates/list': return {resourceTemplates:[]};
     case 'resources/read':
-      if (![resourceUri,'ui://rallumi/chat-v2','ui://rallumi/home'].includes(params.uri)) {
+      if (![resourceUri,'ui://rallumi/preview-v3','ui://rallumi/chat-v2','ui://rallumi/home'].includes(params.uri)) {
         throw rpcError(-32002,'Resource not found');
       }
       return {contents:[{
@@ -118,3 +156,5 @@ for await (const line of lines) {
     .then(result=>respond({result}))
     .catch(error=>respond({error:{code:error.code || -32603,message:error.message}}));
 }
+
+stopService();

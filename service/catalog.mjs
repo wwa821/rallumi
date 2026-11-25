@@ -1,3 +1,4 @@
+import { searchRank } from './public/mentions.js';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -67,7 +68,7 @@ export async function listConversations(rpc, query, cleared = () => false) {
   const threads=[];
   for (let batch=0;batch<5;batch++) {
     const page=await rpc.call('thread/list',{
-      limit:40,cursor,searchTerm:query.get('q') || null,
+      limit:40,cursor,searchTerm:query.get('q')?.normalize('NFKC').trim() || null,
       archived:query.get('view') === 'archived',currentAccountOnly:true,
       sortKey:'updated_at',useStateDbOnly:false
     });
@@ -75,17 +76,20 @@ export async function listConversations(rpc, query, cleared = () => false) {
       if (t.ephemeral) continue;
       const projectId=resolvedProject(t,cleared,desktop);
       if (projectFilter!==null && (projectId || '')!==projectFilter) continue;
+      const title=t.name || t.preview?.trim().split('\n')[0].slice(0,80) || '未命名会话';
       threads.push({
-        id:t.id,title:t.name || t.preview?.trim().split('\n')[0].slice(0,80) || '未命名会话',
+        id:t.id,title,
         cwd:t.cwd,project:projects.get(projectId) || null,projectId,
         section:t.section?.name || null,updatedAt:t.updatedAt
       });
     }
     cursor=page.nextCursor;
-    if (projectFilter===null || threads.length || !cursor) break;
+    if ((!query.get('q') && projectFilter===null) || threads.length || !cursor) break;
   }
   return {
-    threads,order,cursor,
+    threads:threads.map(thread=>({thread,rank:searchRank(query.get('q'),thread.title)}))
+      .sort((a,b)=>(Number.isFinite(a.rank) ? a.rank : 4)-(Number.isFinite(b.rank) ? b.rank : 4))
+      .map(({thread})=>thread),order,cursor,
     projects:[...new Set([...order,...projects.keys()])].filter(id=>projects.has(id)).map(id=>({id,name:projects.get(id)}))
   };
 }

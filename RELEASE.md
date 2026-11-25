@@ -1,28 +1,19 @@
-# Rallumi — First macOS Preview
+# Rallumi v0.2.0
 
-**Run agent teams inside Codex and keep the context you already built.** Rallumi opens from the Codex sidebar and uses your signed-in Codex account.
+This macOS preview makes group conversations easier to start, follow, and stop inside Codex.
 
-- **Continue existing Codex conversations.** Link a group member to an existing thread and keep its history and project context. The member's new turns are written back to that Codex conversation.
-- **Use Codex’s native subagents.** Members can use temporary subagents for delegated work. Rallumi can show their activity in the organization chart.
-- **Coordinate an agent team in one place.** Address one agent or ask a coordinator to involve specialists. See the final answer and who contributed, with the option to hide intermediate updates.
-- **Start with four agents.** The starter group includes a coordinator and three specialists. Give them a task, connect existing conversations, or change the reporting lines.
+- **Quote a message.** Click the reply arrow to quote it. Quoting an agent replies to that agent by default. Use @ to choose a different recipient or address everyone.
+- **End a discussion and move on.** End the current discussion to clear queued work, interrupt active replies, and return to the composer.
+- **Send messages with immediate feedback.** A pending bubble appears while the message is being sent. Failed sends keep the draft. Agent avatars show a moving outline while they work.
+- **Type and find people more easily.** Pinyin composition takes priority over send shortcuts and mention suggestions. Typing after @ filters members, including with a full-width ＠.
+- **Send less group history.** Rallumi avoids repeating the current prompt in the extra group context and prioritizes recent, relevant messages. This uses local rules.
+- **Start with a clearer guide.** The in-app guide can insert an editable example, explains who receives a message, and shows how to connect an existing Codex conversation.
+- **Run the service when needed.** The Codex plugin starts the local service when it connects. The service it starts exits with the plugin. Upgrading removes the login item used by the previous preview.
 
-[See how an existing Codex conversation becomes a team workflow](https://github.com/wwa821/rallumi/blob/main/docs/images/codex-workflow.png).
+## Install or upgrade
 
-## Get started
+Download and unzip **Rallumi-Preview-macOS.zip**, then run **Install Rallumi.command**. Quit and reopen Codex if it was open during the upgrade. Select **Rallumi** in the Codex sidebar.
 
-1. Install and sign in to the Codex desktop app on your Mac.
-2. Download and unzip **Rallumi-Preview-macOS.zip**, then run **Install Rallumi.command**. The installer adds the Codex sidebar plugin and starts the local group-chat service.
-3. Open **Rallumi** in the Codex sidebar. If the icon is missing after installation, quit and reopen Codex.
+The installer reuses your existing local Rallumi data. New installations start with a sample group on the user's Mac. English is the default, with Simplified Chinese available from the sidebar.
 
-Try sending `@Coordinator Help me outline a three-step plan for testing a new product.` in the starter group. The first time an Agent receives work, Rallumi creates a conversation using your Codex account.
-
-## Preview notes
-
-The starter group begins with an empty chat. Rallumi stores its group configuration and chat history on your Mac. Agent tasks run through your signed-in Codex account.
-
-This build is a macOS preview. English is the default. Use Language in the left sidebar to switch to Simplified Chinese. Rallumi remembers your choice. The download includes quick-start guides in both languages.
-
-## License
-
-Rallumi is source-available under the PolyForm Noncommercial License 1.0.0. Commercial use requires a separate written license. For commercial licensing, contact the [maintainer](https://github.com/wwa821).
+Rallumi is available under the [PolyForm Noncommercial License 1.0.0](https://github.com/wwa821/rallumi/blob/main/LICENSE).

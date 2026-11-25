@@ -51,14 +51,14 @@
     <button type="button" class="header-icon" id="open-group-settings" aria-label="群设置" title="群设置" aria-haspopup="dialog" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4l.6 2.3 1.6.9 2.3-.7 2 3.5-1.7 1.6v1.9l1.7 1.6-2 3.5-2.3-.7-1.6.9-.6 2.2h-4l-.6-2.2-1.6-.9-2.3.7-2-3.5 1.7-1.6v-1.9L3.5 9l2-3.5 2.3.7 1.6-.9z"/><circle cx="12" cy="11.5" r="2.6"/></svg></button>
   </div>
 </header>
-<div class="history-viewport"><div class="scroll" id="scroll"><div class="content"><button id="task-announcement" class="task-announcement" type="button" hidden></button><div id="empty"><div class="mark group-avatar" aria-hidden="true"><svg class="avatar-symbol"><use href="#avatar-group"/></svg></div><h2>开始群聊</h2><p id="emptyhint">向全体提问，或在群成员里点名。</p></div><div id="history"></div><div id="live"></div><div id="approvals"></div></div></div><div class="new-message-indicator" aria-live="polite"><button type="button" id="jump-to-latest" hidden></button></div></div>
-<footer><div id="error" role="alert"></div><form id="compose"><textarea rows="2" id="message" aria-label="群消息" aria-autocomplete="list" aria-controls="mention-list" placeholder="发给全体，或输入 @成员名"></textarea><ul id="mention-list" role="listbox" aria-label="点名群成员" hidden></ul><div id="draft-files" aria-label="待发送附件"></div>
+<div class="history-viewport"><div class="scroll" id="scroll"><div class="content"><button id="task-announcement" class="task-announcement" type="button" hidden></button><div id="empty"><div class="mark group-avatar" aria-hidden="true"><svg class="avatar-symbol"><use href="#avatar-group"/></svg></div><h2>开始群聊</h2><p id="emptyhint">向全体提问，或在群成员里点名。</p><button type="button" id="empty-guide">使用说明</button></div><div id="history"></div><div id="pending-send"></div><div id="live"></div><div id="approvals"></div></div></div><div class="new-message-indicator" aria-live="polite"><button type="button" id="jump-to-latest" hidden></button></div></div>
+<footer><div id="error" role="alert"></div><form id="compose"><div id="reply-draft" hidden><span id="reply-preview"></span><button type="button" id="cancel-reply" aria-label="取消引用" title="取消引用">×</button></div><textarea rows="2" id="message" aria-label="群消息" aria-autocomplete="list" aria-controls="mention-list" placeholder="发给全体，或输入 @成员名"></textarea><ul id="mention-list" role="listbox" aria-label="点名群成员" hidden></ul><div id="draft-files" aria-label="待发送附件"></div>
 <div id="compose-task" hidden></div><div class="actions"><div class="compose-tools">
   <button type="button" id="mention-open" aria-label="点名群成员" aria-expanded="false" aria-controls="mention-list">@</button>
   <button type="button" id="attach" aria-label="添加附件" title="添加附件"><span aria-hidden="true">＋</span> 附件</button>
   <input type="file" id="file-input" multiple hidden>
   <button type="button" id="pick-skill">调用 Skill</button>
-</div><div class="send-actions"><span id="send-targets"></span><button id="send" class="primary" disabled>发送</button></div></div></form><div class="discussion-actions"><button id="pause" type="button" disabled>暂停讨论</button></div></footer></section></main>
+</div><div class="send-actions"><span id="send-targets"></span><button id="send" class="primary" disabled>发送</button></div></div></form><div class="discussion-actions"><button id="stop-discussion" type="button" hidden>结束当前讨论</button><button id="pause" type="button" disabled>暂停讨论</button></div></footer></section></main>
 <dialog id="app-settings" aria-labelledby="app-settings-title">
   <div class="dialoghead"><h2 id="app-settings-title">产品设置</h2><button class="dialog-close" type="button" id="close-app-settings" aria-label="关闭">×</button></div>
   <label>界面语言<select id="app-language"><option value="en" lang="en">English</option><option value="zh-CN" lang="zh-CN">简体中文</option></select></label>
@@ -67,23 +67,32 @@
 <dialog id="guide" aria-labelledby="guide-title">
   <div class="dialoghead"><h2 id="guide-title">使用说明</h2><button class="dialog-close" type="button" id="close-guide" aria-label="关闭">×</button></div>
   <div class="guide-content">
-    <section>
-      <h3>试着发一条消息</h3>
-      <p>在体验群里输入下面这句并发送。首次给某位 Agent 派任务时，Rallumi 会用你的 Codex 创建会话。</p>
+    <p class="guide-intro">把 Codex 会话接进同一个群聊。你可以点名一个 Agent，也可以让它请其他成员协作。</p>
+    <section class="guide-start">
+      <h3>发出第一条消息</h3>
+      <p>用下面的示例试试。填入后可以修改，准备好再点发送。</p>
       <p class="guide-example" id="guide-example"></p>
+      <button type="button" class="primary" id="guide-insert">填入示例</button>
+      <p id="guide-example-status" role="status"></p>
     </section>
     <section>
-      <h3>点名和派工</h3>
-      <p>输入 @ 选择成员。统筹可以自己回答简单问题，需要协作时再请研究、执行或复核帮忙。汇总回复下方会标出回传结果的成员。</p>
+      <h3>选择消息发给谁</h3>
+      <p>输入 @ 搜索成员。普通消息默认发给全群。引用成员的消息时，默认只发给该成员。发送前可在输入框下方确认收件人。</p>
     </section>
     <section>
-      <h3>配置自己的群</h3>
-      <p>点页顶部的群成员图标，可以添加 Agent、更改管理关系，也可以把成员关联到一个已有的 Codex 会话。群设置里可以调整字号和协作过程的显示。</p>
+      <h3>接入已有 Codex 会话</h3>
+      <p>在群成员里添加成员，选择「续接已有 Codex 会话」。该成员会沿用原会话的上下文，之后的任务和回复也会写回原会话。</p>
+      <button type="button" id="guide-members">打开群成员</button>
     </section>
-    <section>
-      <h3>连接不上时</h3>
-      <p>确认 Codex 已登录，然后重新运行安装包里的「Install Rallumi.command」，再从侧栏打开。</p>
-    </section>
+    <details>
+      <summary>发送后想停下来</summary>
+      <p>点「结束当前讨论」可取消尚未执行的任务，并停止本轮回复。之后可以直接发新消息。</p>
+    </details>
+    <details>
+      <summary>语言与连接帮助</summary>
+      <p>在左侧打开语言设置，可切换中文和英文。</p>
+      <p>如果一直显示未连接，先关闭并重新打开 Rallumi 面板，再确认 Codex 已登录。</p>
+    </details>
   </div>
 </dialog>
 <dialog id="dialog"><form id="join"><div class="dialoghead"><h2>添加群成员</h2><button class="dialog-close" type="button" id="close" aria-label="关闭">×</button></div><label>会话来源<select id="source"><option value="new">新建 Codex 会话</option><option value="existing">续接已有 Codex 会话</option></select></label>

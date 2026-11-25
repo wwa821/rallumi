@@ -65,29 +65,18 @@ if [[ -z "$node_cli" ]]; then
 fi
 
 "$node_cli" "$source_dir/setup.mjs" "$codex_cli"
-/usr/bin/plutil -lint "$launch_plist"
-if ! /bin/launchctl print "$launch_domain/$label" >/dev/null 2>&1; then
-  /bin/launchctl bootstrap "$launch_domain" "$launch_plist" ||
-    fail "macOS could not enable the local service. Run the installer from your desktop session."
-elif ! "$node_cli" "$source_dir/setup.mjs" health; then
-  /bin/launchctl kickstart "$launch_domain/$label" || true
-fi
-
-ready=false
-for attempt in {1..15}; do
-  if "$node_cli" "$source_dir/setup.mjs" health; then
-    ready=true
-    break
-  fi
-  /bin/sleep 1
-done
-[[ "$ready" == true ]] || fail "The local Rallumi service is not ready. See $app_dir/service-error.log."
-
 print -r -- "Registering the Codex sidebar plugin…"
 "$codex_cli" plugin marketplace add "$app_dir/install" --json ||
   fail "Codex could not register the source. Check local plugin permissions in Codex."
 "$codex_cli" plugin add rallumi@rallumi-preview --json ||
   fail "Codex could not enable Rallumi. Check local plugin permissions in Codex."
 
+# Version 0.1.0 used a login service. The plugin now starts the service itself.
+if /bin/launchctl print "$launch_domain/$label" >/dev/null 2>&1; then
+  /bin/launchctl bootout "$launch_domain/$label" ||
+    fail "Could not stop the previous Rallumi login service."
+fi
+/bin/rm -f -- "$launch_plist"
+
 print -r -- "Installation complete. Open Codex and select Rallumi in the sidebar."
-print -r -- "If Codex is open and the icon is missing, quit and reopen Codex."
+print -r -- "If Codex was open during installation, quit and reopen it to load the updated plugin."

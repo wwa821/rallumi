@@ -87,7 +87,7 @@ export class Room {
     });
     const retrying = new Set([...this.active.values()].map(run=>run.job.retryId));
     for (const pending of Object.values(this.data.nativeQueue)) retrying.add(pending.retryId);
-    return {cwd:this.cwd, showAgentInteractions:this.data.showAgentInteractions, chatFontSize:this.data.chatFontSize, tasks:this.data.tasks.filter(task=>this.visibleTask(task)).map(({files,...task})=>task), retries:Object.keys(this.data.retries).filter(id=>!retrying.has(id)), organization:this.organization.snapshot(), members:this.data.members, messages:this.data.messages.filter(message=>!message.removed), historyRevision:this.data.historyRevision, paused:this.paused,
+    return {cwd:this.cwd, discussionControls:true, showAgentInteractions:this.data.showAgentInteractions, chatFontSize:this.data.chatFontSize, tasks:this.data.tasks.filter(task=>this.visibleTask(task)).map(({files,...task})=>task), retries:Object.keys(this.data.retries).filter(id=>!retrying.has(id)), organization:this.organization.snapshot(), members:this.data.members, messages:this.data.messages.filter(message=>!message.removed), historyRevision:this.data.historyRevision, paused:this.paused,
       active:[...this.active].map(([name,r]) => ({name,text:[...r.items.values()].join('\n\n'), activity:r.activity,interaction:!!(r.job.chain.length || r.asked?.length),startedAt:r.startedAt,updatedAt:r.updatedAt || r.startedAt,queued:this.queues.get(name)?.length||0})).concat(nativeRuns),
       approvals:[...this.approvals].map(([id,a]) => ({id,name:a.name,detail:a.detail,allow:a.allow}))};
   }
@@ -240,26 +240,33 @@ export class Room {
     return task.id;
   }
   post(text, choices = {}) {
-    if (/@\s*$/u.test(text)) throw Error('请选择 @ 成员后再发送');
+    if (/[@＠]\s*$/u.test(text)) throw Error('请选择 @ 成员后再发送');
     if (this.paused) throw Error('请先继续讨论');
     if (!this.data.members.length) throw Error('请先添加群成员');
     if (choices.taskId && !this.data.tasks.some(task=>task.id===choices.taskId && this.visibleTask(task))) throw Error('群公告已失效，请重新选择');
-    const refs = [...text.matchAll(/@([\p{L}\p{N}_-]+)/gu)].map(m=>m[1]);
+    const refs = [...text.matchAll(/[@＠]([\p{L}\p{N}_-]+)/gu)].map(m=>m[1]);
     const members = this.data.members.map(m=>m.name);
     const isEveryone = name => everyoneMention(name,members);
     const unknown = refs.filter(name=>!isEveryone(name) && !members.includes(name));
     if (unknown.length) throw Error('未找到成员 @'+unknown[0]+'。请在成员名后加空格');
     const skillTargets = choices.skillTargets || [];
     if (skillTargets.some(name=>!members.includes(name))) throw Error('所选 Skill 的执行成员已不在群内');
-    const targets = refs.some(isEveryone) ? members
-      : refs.length || skillTargets.length ? [...new Set([...refs,...skillTargets])]
-      : members;
+    const quoted = choices.replyTo == null ? null : this.data.messages[choices.replyTo-1];
+    if (choices.replyTo != null && (!Number.isSafeInteger(choices.replyTo) || !quoted || quoted.removed || quoted.author==='系统')) {
+      throw Error('引用消息已不可用');
+    }
+    const recipients = [...new Set([...refs,...skillTargets])];
+    if (!recipients.length && quoted) {
+      if (!members.includes(quoted.author)) throw Error('请先选择引用回复的收件人');
+      recipients.push(quoted.author);
+    }
+    const targets = refs.some(isEveryone) || !recipients.length ? members : recipients;
     const attachments = choices.attachments?.map(({id,name,size,image}) => ({id,name,size,image}));
     const record = attachments?.length ? attachments : undefined;
-    const messageId=this.add('你',text,'text',record,choices.skill ? {name:choices.skill.name,targets:skillTargets} : undefined,undefined,{taskId:choices.taskId});
+    const messageId=this.add('你',text,'text',record,choices.skill ? {name:choices.skill.name,targets:skillTargets} : undefined,undefined,{taskId:choices.taskId,replyTo:quoted?.id,clientSendId:choices.clientSendId});
     for (const name of targets) {
       this.enqueue(name,{
-        prompt:text, chain:[], depth:0, taskId:choices.taskId, attachments:choices.attachments,
+        prompt:text, messageId, replyTo:quoted?.id, chain:[], depth:0, taskId:choices.taskId, attachments:choices.attachments,
         skill:skillTargets.includes(name) ? choices.skill : undefined
       });
     }
@@ -387,7 +394,32 @@ export class Room {
     }
   }
   prepareTurn(member,job,{native=false}={}) {
-    const history = this.data.messages.filter(x=>x.id>Math.max(member.cursor || 0,this.data.contextResetAt || 0) && !x.removed && x.author!=='系统' && (!x.taskId || x.taskId===job.taskId));
+    const after = Math.max(member.cursor || 0,this.data.contextResetAt || 0);
+    const quoted = job.replyTo ? this.data.messages[job.replyTo-1] : null;
+    const visible = message => !message.removed && message.author!=='系统';
+    const history = this.data.messages.slice(after).filter(message=>visible(message) &&
+      message.id!==job.messageId && message.id!==job.replyTo &&
+      (job.messageId || message.author!=='你' || message.text!==job.prompt) &&
+      (!message.taskId || message.taskId===job.taskId));
+    const terms = [...new Set((job.prompt || '').toLowerCase().match(/[a-z0-9]{3,}|[\p{Script=Han}]{2,}/gu) || [])]
+      .flatMap(term=>/^[\p{Script=Han}]+$/u.test(term)
+        ? Array.from({length:term.length-1},(_,index)=>term.slice(index,index+2)) : [term])
+      .slice(0,40);
+    const recent = history.slice(-4);
+    const relevant = history.slice(0,-4).reverse().filter(message=>message.taskId ||
+      terms.some(term=>message.text?.toLowerCase().includes(term))).slice(0,native ? 4 : 8);
+    const budget = native ? 4500 : 8000;
+    const selected = [];
+    let length = 2;
+    for (const message of [...recent.reverse(),...relevant]) {
+      const text = (message.text || '').slice(0,1800);
+      const entry = [message.author,text];
+      const size = JSON.stringify(entry).length+1;
+      if (text && length+size<=budget) {
+        selected.push({id:message.id,entry});
+        length+=size;
+      }
+    }
     const cursor = this.data.messages.length;
     const members = this.data.members.map(x=>x.name+'（'+x.role+'）').join('、');
     const responsibility = this.organization.responsibility(member.id);
@@ -398,7 +430,8 @@ export class Room {
         ? '需要群成员协助时，在最终答复末尾写 /ask 成员甲、成员乙、成员丙 具体任务。同一问题一次点名多人，不同问题分行写 /ask。群聊并行投递，收齐后统一回传。请避免在群里逐条复述投递进度。'
         : '需要群成员协助时，用 ask_member 的 members 一次点名多人。遇到只支持单人的工具版本或无此工具时，改在最终答复末尾写 /ask 成员甲、成员乙、成员丙 具体问题。不同问题可以分行写 /ask 或在本轮多次登记。群聊并行投递，收齐后统一回传。请避免在群里逐条复述投递进度。')+
         '普通 @ 只是引用。被要求答复时直接给出答案，群系统将自动送回提问者。',
-      '以下是群内可见的新消息：', JSON.stringify(history.slice(native ? -30 : -100).map(x=>[x.author,x.text])).slice(native ? -12000 : -48000),
+      ...(selected.length ? ['相关群聊消息：',JSON.stringify(selected.sort((a,b)=>a.id-b.id).map(item=>item.entry))] : []),
+      ...(quoted && visible(quoted) ? ['本轮引用的原消息（作为参考）：',JSON.stringify([quoted.author,(quoted.text || '').slice(0,4000)])] : []),
     ];
     if (member.personality) context.splice(1,0,'用户设置的沟通风格：'+member.personality);
     const input = [{type:'text', text:job.prompt || (job.skill ? '请调用所选 Skill。' : '请查看这条消息的附件。'), text_elements:[]}];
@@ -432,6 +465,7 @@ export class Room {
     const request=run.job.request ?? run.job.prompt;
     const pending={
       cursor,chain,depth,taskId,contributors,handoffCredits,batchId,request,
+      replyTo:run.job.replyTo,messageId:run.job.messageId,
       clientId:randomUUID(),threadId:member.thread,retryId:run.job.retryId,
       since:Date.now(),activity:'正在交给 Codex 原会话'
     };
@@ -545,6 +579,10 @@ export class Room {
             this.completeNativeQueue(member,pending,answer,issue,childNames);
             return;
           }
+          if (pending.cancelled && turn?.status==='inProgress' && pending.interruptSent!==turn.id) {
+            await this.rpc.call('turn/interrupt',{threadId:pending.threadId,turnId:turn.id},signal);
+            pending.interruptSent=turn.id;
+          }
           if (turn) {
             const running=turn.status==='inProgress';
             this.updateNativeSync(pending,running ? 'Codex 原会话正在处理' : '正在同步 Codex 原会话',
@@ -556,6 +594,16 @@ export class Room {
               if (this.data.nativeQueue[member.id]!==pending) return;
               queued=data.find(item=>item.clientUserMessageId===pending.clientId);
               if (queued) pending.submissionId=queued.id;
+              if (queued && pending.cancelled) {
+                const {deleted}=await this.rpc.call('thread/queue/delete',{
+                  threadId:pending.threadId,queuedSubmissionId:queued.id
+                },signal);
+                if (this.data.nativeQueue[member.id]!==pending) return;
+                if (deleted) {
+                  this.completeNativeQueue(member,pending,'',null);
+                  return;
+                }
+              }
             }
             this.updateNativeSync(pending,queued ? '已交给 Codex 原会话，等待处理' : '正在核对 Codex 原会话',
               {uncertain:!queued,queued:!!queued});
@@ -585,8 +633,14 @@ export class Room {
     if (pending.retryId) delete this.data.retries[pending.retryId];
     const name=member.name;
     const run={job:{chain:pending.chain || [],depth:pending.depth || 0,taskId:pending.taskId,
-      contributors:pending.contributors,handoffCredits:pending.handoffCredits,batchId:pending.batchId,request:pending.request}};
+      contributors:pending.contributors,handoffCredits:pending.handoffCredits,batchId:pending.batchId,request:pending.request,
+      replyTo:pending.replyTo,messageId:pending.messageId}};
     run.contributors=[...new Set([...(pending.contributors || []),...childNames])].filter(label=>label!==name);
+    if (pending.cancelled) {
+      this.save();
+      void this.run(name);
+      return;
+    }
     const result=this.extractHandoff(name,run,answer,issue);
     if (!result.error && pending.cursor) member.cursor=Math.max(member.cursor || 0,pending.cursor);
     if (result.answer) this.add(name,result.answer,'text',undefined,undefined,undefined,{taskId:run.job.taskId,contributors:run.contributors,interaction:!!(run.job.chain.length || run.asked?.length)});
@@ -634,8 +688,8 @@ export class Room {
     ({answer,error}=this.extractHandoff(name,r,answer,error));
     const children=[...(r.childIds || [])].map(id=>this.data.nativeChildren[id]?.name || '子 Agent '+id.slice(-5));
     r.contributors=[...new Set([...(r.job.contributors || []),...children])].filter(label=>label!==name);
-    if(answer) this.add(name,answer,'text',undefined,undefined,undefined,{taskId:r.job.taskId,contributors:r.contributors,interaction:!!(r.job.chain.length || r.asked?.length)});
-    if ((error || r.cancel) && (!retryId || !this.data.messages.some(msg=>msg.retryId===retryId))) {
+    if(answer && !r.cancel) this.add(name,answer,'text',undefined,undefined,undefined,{taskId:r.job.taskId,contributors:r.contributors,interaction:!!(r.job.chain.length || r.asked?.length)});
+    if (!r.stopped && (error || r.cancel) && (!retryId || !this.data.messages.some(msg=>msg.retryId===retryId))) {
       this.add('系统',name+' · '+(error||'已暂停'),'text',undefined,undefined,retryId);
     }
     if (r.job.retryId && !retryId && (!r.cancel || r.turn)) delete this.data.retries[r.job.retryId];
@@ -671,15 +725,15 @@ export class Room {
       const id=randomUUID();
       this.data.handoffBatches[id]={owner:name,targets:r.asked.flatMap(request=>request.targets),replies:[],resume:{
         chain:r.job.chain,depth:depth+1,taskId,batchId:r.job.batchId,handoffCredits,contributors:r.contributors,
-        request:r.job.request ?? r.job.prompt
+        request:r.job.request ?? r.job.prompt,replyTo:r.job.replyTo,messageId:r.job.messageId
       }};
       const questions=new Map();
       for (const {targets,question} of r.asked) questions.set(question,[...(questions.get(question) || []),...targets]);
       for (const [question,targets] of questions) {
         const mentions=targets.map(target=>'@'+target).join(' ');
-        this.add(name,mentions+' '+question,'question',undefined,undefined,undefined,{taskId});
+        const messageId=this.add(name,mentions+' '+question,'question',undefined,undefined,undefined,{taskId});
         for (const target of targets) this.enqueue(target,{
-          prompt:name+' 提问：'+question,chain:[...r.job.chain,name],depth:depth+1,taskId,batchId:id
+          prompt:name+' 提问：'+question,messageId,replyTo:r.job.replyTo,chain:[...r.job.chain,name],depth:depth+1,taskId,batchId:id
         });
       }
     } else if (r.job.batchId) {
@@ -792,6 +846,15 @@ export class Room {
   async interrupt(m,r) {
     try { await r.rpc.call('turn/interrupt',{threadId:m.thread,turnId:r.turn}); }
     catch(e){ if(this.active.get(m.name)===r) this.add('系统','中断请求失败：'+e.message); }
+  }
+  stopDiscussion() {
+    for (const run of this.active.values()) run.stopped=true;
+    for (const pending of Object.values(this.data.nativeQueue)) pending.cancelled=true;
+    this.pause(true);
+    this.data.retries={};
+    this.paused=false;
+    this.save();
+    for (const member of this.data.members) void this.monitorNativeQueue(member);
   }
   pause(value) {
     this.paused=value;
